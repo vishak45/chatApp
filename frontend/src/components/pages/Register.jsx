@@ -1,9 +1,17 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
-
+import React, { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import useAuth from "../lib/useAuth";
 function Register() {
+  const navigate = useNavigate();
   const [image, setImage] = useState(null);
+  const { register, setMsg,success} = useAuth();
+  useEffect(() => {
+    if (success&&success===true) {
+      setMsg();
+      navigate("/login");
 
+    }
+  }, [success]);
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-lg w-full max-w-md border border-gray-100 dark:border-gray-700">

@@ -14,7 +14,9 @@ const io=new Server(server,{
   cors:{
     origin:"*",
     methods:["GET","POST"]
-  }
+  },
+   maxHttpBufferSize: 1e7 
+  
 })
 
 app.use('/api/user',loginUser)
@@ -24,7 +26,7 @@ io.on("connection",(socket)=>{
   socket.on("message",(data)=>{
    
     const {msg,uid,room,image}=data
-    socket.to(room).emit("message",{msg:msg,uid:uid,image:image})
+    socket.to(room).emit("message",{msg:msg,uid:uid,image:image,ts: Date.now()})
   })
   socket.on("join-room",(data)=>{
     const {uid,room}=data
