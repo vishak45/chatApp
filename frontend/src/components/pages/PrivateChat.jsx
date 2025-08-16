@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from "react";
 import io from "socket.io-client";
 
@@ -6,15 +5,16 @@ const socket = io.connect("http://localhost:5000");
 
 function PrivateChat() {
   const [uid, setUid] = useState("");
-  const [msg, setMsg] = useState({}); 
+  const [msg, setMsg] = useState({});
   const [results, setResults] = useState([]);
-  const [room, setRoom] = useState("");
-  const [showToggle, setShowToggle] = useState(true);
+  const [users, setUsers] = useState(["Alice", "Bob", "Charlie", "Diana"]);
+  const [groups, setGroups] = useState(["Group 1", "Group 2", "Group 3"]);
+  const [activeUser, setActiveUser] = useState(null);
   const [messageText, setMessageText] = useState("");
   const [image, setImage] = useState(null);
+  const [typing, setTyping] = useState("");
   const messagesEndRef = useRef(null);
   const imageInputRef = useRef(null);
-  const [typing, setTyping] = useState('');
 
   const setMg = (data) => {
     setResults((prev) => [...prev, data]);
@@ -25,206 +25,251 @@ function PrivateChat() {
       setUid(data);
     });
 
-    socket.on("message", (data) => {setTyping('');setMg(data)});
+    socket.on("message", (data) => {
+      setTyping("");
+      setMg(data);
+    });
+
     socket.on("typing", (data) => {
       setTyping(data);
-      clearTimeout();
-     
+      clearTyping();
+    });
 
-    })
     return () => {
       socket.off("my-id");
       socket.off("message");
       socket.off("typing");
-      clearTimeout();
     };
-  
-  }, [socket]);
-   const clearTimeout =()=> setTimeout(() => {
-        setTyping('');
-      }, 3000);
+  }, []);
 
-  // auto-scroll to bottom
+  const clearTyping = () =>
+    setTimeout(() => {
+      setTyping("");
+    }, 3000);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [results]);
 
-  const handleJoin = (e) => {
-    e.preventDefault();
-    if (!room.trim()) return;
-    socket.emit("join-room", { uid, room });
-    setShowToggle(false);
-  };
-
   const handleSend = (e) => {
-    
     e.preventDefault();
     const trimmed = messageText.trim();
-    if (!trimmed) return;
+    if (!trimmed || !activeUser) return;
+
     const payload = {
       msg: trimmed,
       uid,
-      room,
+      to: activeUser,
       ts: Date.now(),
-      image
+      image,
     };
 
-    socket.emit("message", payload);
-
-    // locally add message (server might echo it back; dedup can be added later)
+    socket.emit("private-message", payload);
     setResults((prev) => [...prev, payload]);
     setMessageText("");
     setImage(null);
-    setMsg({}); // optional: keep msg state consistent
+    setMsg({});
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-3xl bg-white rounded-2xl shadow-md overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h1 className="text-lg font-semibold">Private Chat</h1>
-          <div className="text-sm text-gray-600">
-            Your ID: <span className="font-medium text-gray-800">{uid || "—"}</span>
-            <div>
-              {
-                typing && uid !== typing && (
-                  <p>{typing} is typing...</p>
-                )
-              }
+    <div className="h-screen bg-gray-900 flex flex-col md:flex-row text-gray-200">
+      {/* Sidebar */}
+      <div className="w-full md:w-64 bg-gray-800 border-b md:border-b-0 md:border-r border-gray-700 shadow-md p-4 flex flex-col">
+        <h2 className="text-lg font-semibold text-blue-400 mb-2 md:mb-4">
+          Users
+        </h2>
+        <div className="flex-1 overflow-x-auto md:overflow-y-auto flex md:block gap-2 md:gap-0">
+          {users.map((user) => (
+            <div key={user} className="flex gap-2 items-center mb-2">
+              <button
+                onClick={() => {
+                  setActiveUser(user);
+                  setResults([]);
+                }}
+                className={`flex-1 text-left px-3 py-2 rounded-lg text-sm md:text-base transition ${
+                  activeUser === user
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-700 hover:bg-gray-600"
+                }`}
+              >
+                {user}
+              </button>
+              <div
+                onClick={() => {
+                  const urs = users.filter((g) => g !== user);
+                  setUsers([user, ...urs]);
+                }}
+                className="ml-1 cursor-pointer text-gray-400 hover:text-yellow-400 transition"
+                title="Pin chat"
+              >
+                📌
+              </div>
             </div>
-          </div>
-
+          ))}
         </div>
 
-        {/* Body */}
-        <div className="p-6">
-          {showToggle ? (
-            <div className="max-w-md mx-auto">
-              <form onSubmit={handleJoin} className="space-y-4">
-                <label className="block text-sm font-medium text-gray-700">Join a room</label>
-                <input
-                  type="text"
-                  placeholder="roomid"
-                  value={room}
-                  onChange={(e) => setRoom(e.target.value)}
-                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-                />
-                <div className="flex justify-end">
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                  >
-                    Join
-                  </button>
-                </div>
-              </form>
-            </div>
-          ) : (
-            <div className="flex flex-col h-[60vh]">
-              {/* Room info */}
-              <div className="mb-4 flex items-center justify-between">
-                <div className="text-sm text-gray-600">
-                  Room: <span className="font-medium text-gray-800">{room}</span>
-                </div>
-                <button
-                  onClick={() => {
-                    setShowToggle(true);
-                    setResults([]);
-                    setRoom("");
-                  }}
-                  className="text-sm text-red-600 hover:underline"
-                >
-                  Leave
-                </button>
-              </div>
-
-              {/* Chat messages */}
-              <div className="flex-1 bg-gray-50 p-4 rounded-xl overflow-y-auto space-y-3">
-                {results.map((item, index) => {
-                  const isMine = item.uid === uid;
-                  return (
-                    <div key={index} className={`flex ${isMine ? "justify-start" : "justify-end"}`}>
-                      <div
-                        className={`max-w-[75%] px-4 py-2 rounded-xl break-words ${
-                          isMine
-                            ? "bg-cyan-600 text-white rounded-br-none shadow-sm"
-                            : "bg-green-600 text-white rounded-bl-none"
-                        }`}
-                      >
-                        <div>
-                          {
-                            item.image && (
-                              <img src={item.image} alt="img" className="w-[200px]"/>
-                            )
-                          }
-                          </div>
-                        <div className="text-sm">{item.msg}</div>
-                        <div className="text-[10px] text-white-300 mt-1 text-right">
-                          {item.ts ? new Date(item.ts).toLocaleTimeString() : ""}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                <div ref={messagesEndRef} />
-              </div>
-
-              {/* Input area */}
-              <div className="mt-4">
-                <form onSubmit={handleSend} className="flex items-center gap-3">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    ref={imageInputRef}
-                    onChange={(e) => {
-                      const file=e.target.files[0]
-                      const reader=new FileReader()
-                      reader.readAsDataURL(file)
-                      reader.onload=()=>{
-                        const base64= reader.result
-                        setImage(base64)
-                        imageInputRef.current.value=""
-
-                      }
-                     
-                     
-                    }}
-                    
-                    className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 w-10 h-10"
-                    />
-                    {
-                      image && (
-                        <div className="flex items-center gap-3">
-                        <img src={image} alt="image" className="w-10 h-10" />
-                        <button onClick={() => {setImage("")}}>X</button>
-                        </div>
-                      )
-                    }
-                  <input
-                    type="text"
-                    placeholder="message"
-                    value={messageText}
-                    onChange={(e) => {
-                      socket.emit("typing", { uid, room });
-                      setMessageText(e.target.value);
-                      setMsg((prev) => ({ ...prev, msg: e.target.value, uid, room }));
-                      
-                    }}
-                    className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  />
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                  >
-                    Send
-                  </button>
-                </form>
+        <h2 className="text-lg font-semibold text-blue-400 mt-4 mb-2 md:mb-4">
+          Groups
+        </h2>
+        <div className="flex-1 overflow-x-auto md:overflow-y-auto flex md:block gap-2 md:gap-0">
+          {groups.map((group) => (
+            <div key={group} className="flex gap-2 items-center mb-2">
+              <button
+                onClick={() => {
+                  setActiveUser(group);
+                  setResults([]);
+                }}
+                className={`flex-1 text-left px-3 py-2 rounded-lg text-sm md:text-base transition ${
+                  activeUser === group
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-700 hover:bg-gray-600"
+                }`}
+              >
+                {group}
+              </button>
+              <div
+                onClick={() => {
+                  const grps = groups.filter((g) => g !== group);
+                  setGroups([group, ...grps]);
+                }}
+                className="ml-1 cursor-pointer text-gray-400 hover:text-yellow-400 transition"
+                title="Pin chat"
+              >
+                📌
               </div>
             </div>
+          ))}
+        </div>
+
+        <div className="mt-4 text-xs text-gray-400 text-center md:text-left">
+          Your ID: <span className="font-medium text-gray-200">{uid || "—"}</span>
+        </div>
+      </div>
+
+      {/* Chat Area */}
+      <div className="flex-1 flex flex-col">
+        {/* Header */}
+        <div className="px-4 md:px-6 py-3 md:py-4 border-b border-gray-700 bg-gray-800 flex items-center justify-between">
+          <h1 className="text-base md:text-lg font-semibold text-blue-300 truncate">
+            {activeUser ? `Chat with ${activeUser}` : "Select a user"}
+          </h1>
+          {typing && uid !== typing && (
+            <p className="text-xs md:text-sm text-gray-400">{typing} is typing...</p>
           )}
         </div>
+
+        {/* Placeholder */}
+        {!activeUser && (
+          <div className="flex flex-col items-center justify-center flex-1 text-center text-gray-400 p-4">
+            <div className="bg-gray-800 p-6 md:p-8 rounded-2xl shadow-md w-full max-w-sm">
+              <h2 className="text-lg md:text-xl font-semibold text-blue-400 mb-2">
+                Choose a user or group
+              </h2>
+              <p className="text-gray-300 text-sm md:text-base">to start conversation</p>
+            </div>
+          </div>
+        )}
+
+        {/* Messages */}
+        {activeUser && (
+          <div className="flex-1 p-4 md:p-6 overflow-y-auto bg-gray-900 space-y-3">
+            {results.map((item, index) => {
+              const isMine = item.uid === uid;
+              return (
+                <div
+                  key={index}
+                  className={`flex ${isMine ? "justify-start" : "justify-end"}`}
+                >
+                  <div
+                    className={`max-w-[85%] md:max-w-[70%] px-3 md:px-4 py-2 rounded-xl break-words ${
+                      isMine
+                        ? "bg-blue-600 text-white rounded-br-none"
+                        : "bg-gray-700 text-gray-200 rounded-bl-none"
+                    }`}
+                  >
+                    {item.image && (
+                      <img
+                        src={item.image}
+                        alt="img"
+                        className="w-[150px] md:w-[200px] mb-2 rounded"
+                      />
+                    )}
+                    <div className="text-xs md:text-sm">{item.msg}</div>
+                    <div className="text-[9px] md:text-[10px] mt-1 text-right opacity-70">
+                      {item.ts ? new Date(item.ts).toLocaleTimeString() : ""}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            <div ref={messagesEndRef} />
+          </div>
+        )}
+
+        {/* Input */}
+        {activeUser && (
+          <div className="p-3 md:p-4 bg-gray-800 border-t border-gray-700">
+            <form onSubmit={handleSend} className="flex items-center gap-2 md:gap-3">
+              <input
+                type="file"
+                accept="image/*"
+                ref={imageInputRef}
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.readAsDataURL(file);
+                  reader.onload = () => {
+                    setImage(reader.result);
+                    imageInputRef.current.value = "";
+                  };
+                }}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => imageInputRef.current.click()}
+                className="px-2 md:px-3 py-2 bg-gray-700 rounded-lg hover:bg-gray-600 text-gray-200"
+              >
+                📎
+              </button>
+              {image && (
+                <div className="flex items-center gap-2">
+                  <img src={image} alt="preview" className="w-8 h-8 md:w-10 md:h-10 rounded" />
+                  <button
+                    type="button"
+                    onClick={() => setImage(null)}
+                    className="text-red-400 text-sm md:text-base"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+              <input
+                type="text"
+                placeholder="Type a message..."
+                value={messageText}
+                onChange={(e) => {
+                  socket.emit("typing", uid);
+                  setMessageText(e.target.value);
+                  setMsg((prev) => ({
+                    ...prev,
+                    msg: e.target.value,
+                    uid,
+                    to: activeUser,
+                  }));
+                }}
+                className="flex-1 px-3 md:px-4 py-2 border border-gray-700 rounded-lg bg-gray-900 text-gray-200 text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                type="submit"
+                className="px-3 md:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm md:text-base"
+              >
+                Send
+              </button>
+            </form>
+          </div>
+        )}
       </div>
     </div>
   );
