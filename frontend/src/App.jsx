@@ -5,6 +5,7 @@ import Loginpage from './components/pages/Loginpage'
 import Home from './components/pages/Home'
 import Register from './components/pages/Register'
 import Header from './components/pages/Header'
+import Footer from './components/pages/Footer'
 function App() {
   return (
     <>
@@ -16,6 +17,7 @@ function App() {
             <Route path="/register" element={<Register/>}/>
             <Route path="/login" element={<Loginpage/>}/>
         </Routes>
+        <Footer/>
     </Router>
     </>
   )

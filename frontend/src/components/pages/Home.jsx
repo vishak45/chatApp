@@ -213,24 +213,7 @@ function Home() {
         </section>
 
         {/* Footer */}
-        <footer className="mt-12 text-sm text-gray-500 dark:text-gray-400">
-          <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-between">
-            <div className="mb-4 md:mb-0">
-              © {new Date().getFullYear()} Chatly — Built with ❤️ for real-time apps.
-            </div>
-            <div className="space-x-4">
-              <Link to="/terms" className="hover:underline">
-                Terms
-              </Link>
-              <Link to="/privacy" className="hover:underline">
-                Privacy
-              </Link>
-              <Link to="/contact" className="hover:underline">
-                Contact
-              </Link>
-            </div>
-          </div>
-        </footer>
+        
       </main>
     </div>
   );
